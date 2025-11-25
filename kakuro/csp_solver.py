@@ -1,18 +1,26 @@
 # kakuro/csp_solver.py
 
 import copy
+import time
+from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, Tuple, Set, List, Optional
 
 from .model import KakuroPuzzle, Run
 from .combinations import COMBO_TABLE
 
-Var = Tuple[int, int]  # (row, col)
+Var = Tuple[int, int]          # (row, col)
 Assignment = Dict[Var, int]
 Domains = Dict[Var, Set[int]]
 
-
 DIGITS: Set[int] = set(range(1, 10))
+
+
+@dataclass
+class SolverStats:
+    nodes: int = 0        # recursive calls / states visited
+    backtracks: int = 0   # times a branch failed
+    time: float = 0.0     # wall-clock time in seconds
 
 
 def build_neighbors(puzzle: KakuroPuzzle) -> Dict[Var, Set[Var]]:
@@ -126,18 +134,14 @@ def is_consistent(
     Check local consistency of assigning var = value:
     - With runs that include this variable.
     """
-    # Temporarily assign
     assignment[var] = value
-
     try:
         for run_id in puzzle.cell_to_runs.get(var, []):
             run = puzzle.runs[run_id]
             if not is_run_feasible(run, assignment):
                 return False
     finally:
-        # Undo temporary assignment
         assignment.pop(var)
-
     return True
 
 
@@ -150,7 +154,8 @@ def forward_check(
 ) -> bool:
     """
     Forward checking step:
-    - Remove 'value' from domains of other cells in the same runs (since digits in a run must be unique).
+    - Remove 'value' from domains of other cells in the same runs
+      (since digits in a run must be unique).
     """
     for run_id in puzzle.cell_to_runs.get(var, []):
         run = puzzle.runs[run_id]
@@ -176,16 +181,21 @@ def select_unassigned_variable(
     variables: List[Var],
     domains: Domains,
     neighbors: Dict[Var, Set[Var]],
+    use_mrv: bool,
 ) -> Var:
     """
-    MRV (Minimum Remaining Values) + degree heuristic.
+    Variable ordering:
+    - If use_mrv = True: MRV + degree heuristic.
+    - Else: simple order (first unassigned variable).
     """
     unassigned = [v for v in variables if v not in assignment]
 
-    def key_fn(var: Var):
-        return (len(domains[var]), -len(neighbors[var]))
-
-    return min(unassigned, key=key_fn)
+    if use_mrv:
+        def key_fn(var: Var):
+            return (len(domains[var]), -len(neighbors[var]))
+        return min(unassigned, key=key_fn)
+    else:
+        return unassigned[0]
 
 
 def order_domain_values(
@@ -193,10 +203,18 @@ def order_domain_values(
     assignment: Assignment,
     domains: Domains,
     neighbors: Dict[Var, Set[Var]],
+    use_lcv: bool,
 ) -> List[int]:
     """
-    LCV (Least Constraining Value) heuristic.
+    Value ordering:
+    - If use_lcv = True: Least Constraining Value.
+    - Else: ascending order.
     """
+    values = list(domains[var])
+
+    if not use_lcv:
+        return sorted(values)
+
     def conflict_count(val: int) -> int:
         count = 0
         for n in neighbors[var]:
@@ -204,7 +222,6 @@ def order_domain_values(
                 count += 1
         return count
 
-    values = list(domains[var])
     values.sort(key=conflict_count)
     return values
 
@@ -215,13 +232,20 @@ def backtrack(
     domains: Domains,
     puzzle: KakuroPuzzle,
     neighbors: Dict[Var, Set[Var]],
+    stats: SolverStats,
+    use_mrv: bool,
+    use_lcv: bool,
 ) -> Optional[Assignment]:
+    stats.nodes += 1
+
     if is_complete(assignment, variables):
         return assignment
 
-    var = select_unassigned_variable(assignment, variables, domains, neighbors)
+    var = select_unassigned_variable(
+        assignment, variables, domains, neighbors, use_mrv
+    )
 
-    for value in order_domain_values(var, assignment, domains, neighbors):
+    for value in order_domain_values(var, assignment, domains, neighbors, use_lcv):
         if is_consistent(var, value, assignment, puzzle):
             new_assignment = assignment.copy()
             new_assignment[var] = value
@@ -236,30 +260,45 @@ def backtrack(
                 new_domains,
                 puzzle,
                 neighbors,
+                stats,
+                use_mrv,
+                use_lcv,
             )
             if result is not None:
                 return result
 
+    stats.backtracks += 1
     return None
 
 
-def solve_kakuro(puzzle: KakuroPuzzle) -> Assignment:
+def solve_kakuro(
+    puzzle: KakuroPuzzle,
+    use_mrv: bool = True,
+    use_lcv: bool = True,
+) -> Tuple[Assignment, SolverStats]:
     """
-    High-level solve function.
+    High-level solve function with heuristic toggles and timing.
     """
     domains = initialize_domains(puzzle)
     neighbors = build_neighbors(puzzle)
     assignment: Assignment = {}
+    stats = SolverStats()
 
+    start = time.perf_counter()
     solution = backtrack(
         assignment,
         puzzle.variables,
         domains,
         puzzle,
         neighbors,
+        stats,
+        use_mrv,
+        use_lcv,
     )
+    end = time.perf_counter()
+    stats.time = end - start
 
     if solution is None:
         raise ValueError("No solution found for this Kakuro puzzle.")
 
-    return solution
+    return solution, stats

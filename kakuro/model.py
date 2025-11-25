@@ -83,3 +83,28 @@ class KakuroPuzzle:
                         rr += 1
                     if cells:
                         add_run(cells, cell.down_sum)
+                        
+    def check_solution(self, assignment: dict) -> bool:
+        """
+        Verify that an assignment satisfies all Kakuro constraints:
+        - every run is fully assigned
+        - digits in a run are all distinct
+        - sum of each run equals its clue total
+        """
+        for run in self.runs.values():
+            values = []
+            for cell in run.cells:
+                if cell not in assignment:
+                    return False
+                values.append(assignment[cell])
+
+            # no duplicates in a run
+            if len(values) != len(set(values)):
+                return False
+
+            # correct sum
+            if sum(values) != run.total:
+                return False
+
+        return True
+
