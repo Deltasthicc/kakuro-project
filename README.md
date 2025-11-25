@@ -33,13 +33,14 @@ The parser (`parser.py`) converts each token into a `Cell` dataclass instance.
 ## 3. Code Structure Overview
 ```
 main.py                # CLI entrypoint / printing utilities
+run_all.py             # Batch benchmark runner (all puzzles, all heuristics)
 kakuro/
   __init__.py          # Re-exports load_puzzle / solve_kakuro
   parser.py            # File -> KakuroPuzzle
   model.py             # Cell, Run, KakuroPuzzle (run extraction + validation)
   combinations.py      # Precomputed (length,sum)->digit combinations
   csp_solver.py        # CSP search + heuristics + forward checking
-puzzles/               # Sample inputs
+puzzles/               # Sample inputs (sample1..sample11, extendable)
 ```
 
 ---
@@ -202,6 +203,15 @@ Single heuristic:
 python main.py puzzles/sample5.txt --method full
 ```
 
+Batch benchmarking across all puzzles (writes CSV):
+```
+python run_all.py --puzzles-dir puzzles --csv results.csv
+```
+Demo mode (subset only):
+```
+python run_all.py --demo
+```
+
 ---
 ## 14. Glossary
 - **Run**: Contiguous white cells governed by a clue sum.
@@ -224,11 +234,65 @@ The solver favors readability + classic CSP patterns over micro-optimizations. P
 - Some truncated lines in excerpts (e.g., comments inside `csp_solver.py`) in documentation do not affect core logic; the actual code drives behavior.
 - No advanced consistency (e.g., full arc consistency) yet.
 - Assumes well-formed puzzle files; minimal error recovery beyond basic validation.
+- Batch runner `run_all.py` executes puzzles sequentially (no parallelism); for very large sets you could parallelize externally.
 
 ---
 ## 18. License / Usage
 No license header added here; adapt according to course requirements or organization policy.
 
 ---
+## 19. Batch Runner & Benchmarking (`run_all.py`)
+Purpose: Automate solver runs over every `*.txt` in `puzzles/` for each heuristic configuration (`basic`, `mrv`, `lcv`, `full`). Captures performance metrics to stdout and (optionally) a CSV.
+
+Features:
+- Prints raw puzzle file first (for human inspection / reproducibility).
+- Reuses a single parsed puzzle object per file for all methods (avoids repeated I/O).
+- Aggregates rows: puzzle name, method flags, nodes, backtracks, time, validity.
+- Optional demo subset (`--demo`) to keep quick classroom demonstrations fast.
+
+Example command:
+```
+python run_all.py --puzzles-dir puzzles --csv benchmark.csv
+```
+
+## 20. CSV Output Schema
+Columns written when `--csv` is provided:
+| Column      | Description                               |
+|-------------|-------------------------------------------|
+| puzzle      | Base filename without extension           |
+| file        | Original filename                         |
+| method      | Heuristic label                           |
+| use_mrv     | 0/1 flag                                  |
+| use_lcv     | 0/1 flag                                  |
+| nodes       | Total search states explored              |
+| backtracks  | Dead-end reversions                       |
+| time_sec    | Elapsed wall-clock seconds                |
+| valid       | 0/1 solution validity check               |
+
+## 21. Adding New Puzzles
+1. Create a `.txt` file in `puzzles/` following the token format (Section 2).
+2. Ensure first line has correct `rows cols` count.
+3. Run a single solve to verify:
+  ```
+  python main.py puzzles/your_puzzle.txt --method full
+  ```
+4. Include in batch runs automatically (unless using `--demo`).
+
+## 22. Demo Mode
+`run_all.py --demo` limits execution to a curated set (`DEMO_PUZZLES`) for faster live presentations. Edit `DEMO_PUZZLES` set in the script to tailor.
+
+## 23. Performance Guidance
+- High `nodes` + low `backtracks` suggests broad but efficient exploration (perhaps domains still large).
+- High `backtracks` means heuristic ordering could be improved; try `full`.
+- Compare `basic` vs `full` to quantify heuristic impact for reports.
+- Time dominated by constraint checks; large puzzles benefit from further pruning (e.g., future AC-3 addition).
+
+## 24. Future Benchmark Extensions
+- Parallel process pool for large puzzle suites.
+- Persist intermediate stats (e.g., per-depth node counts).
+- Add memory usage sampling.
+- Integrate a visualization notebook rendering search progression.
+
+---
 ### End
-Feel free to extend heuristics or integrate with other CSP frameworks. The modular breakdown aims to be a teaching aid as well as a functional solver.
+Feel free to extend heuristics, integrate AC-3, or build analytics over the CSV output. The modular breakdown aims to be both a teaching aid and a practical solver/benchmark harness.
