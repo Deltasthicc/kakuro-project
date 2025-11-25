@@ -1,8 +1,10 @@
-7 7
-X D15 D2 D16 D4 D17 X
-A15 . . . . . X
-A2 . A1D1 . A1D4 . X
-A16 . . . . . X
-A4 . A4D1 . A2D2 . X
-A17 . . . . . X
-X X X X X X X
+9 9
+X X D15 D3 X X D30 D17 D14
+X A3 . . D17 A23 . . .
+X A15D3 . . . A24D16 . . .
+A3 . . A24 . . . D28 X
+A4 . . D10 A23D4 . . . D13
+X A7 . . . D3 A10 . .
+X D4 A6D3 . . . A16D3 . .
+A6 . . . A7 . . . X
+A8 . . . X A4 . . X

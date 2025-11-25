@@ -1,6 +1,6 @@
 5 5
-X D6 D2 D6 X
-A6 . . . X
-A2 . A1D1 . X
-A6 . . . X
-X X X X X
+X X D16 D26 X
+X A11D11 . . D17
+A29 . . . .
+A14 . . . .
+X A16 . . X

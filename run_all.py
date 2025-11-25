@@ -12,6 +12,10 @@ You can also use --demo to only run a subset of puzzles.
 
 Now also prints the puzzle grid (raw text from the .txt file)
 before showing the statistics.
+
+Updated:
+- Sort puzzles in natural numeric order (sample1, sample2, ..., sample15)
+- Print the solved grid (answer) once per puzzle.
 """
 
 import os
@@ -39,6 +43,15 @@ DEMO_PUZZLES = {
 }
 
 
+def puzzle_sort_key(filename: str) -> int:
+    """
+    Extract the integer in filenames like 'sample12.txt'
+    so puzzles sort as sample1, sample2, ..., sample10, ..., sample15.
+    """
+    digits = "".join(ch for ch in filename if ch.isdigit())
+    return int(digits) if digits else 0
+
+
 def print_puzzle_file(path: str) -> None:
     """Print the raw puzzle grid from the text file."""
     print("Puzzle grid (from file):")
@@ -51,6 +64,77 @@ def print_puzzle_file(path: str) -> None:
     print()  # blank line
 
 
+def lookup_cell_value(solution, row_idx: int, col_idx: int):
+    """
+    Try to find the value for a given (row, col) in the solution mapping.
+
+    We don't know exactly how your CSP keys cells, so we try several common
+    conventions:
+      - (row, col) 0-based
+      - (row+1, col+1) 1-based
+      - "row,col" 0-based string
+      - "row+1,col+1" 1-based string
+
+    If none of these exist, return None.
+    """
+    candidates = (
+        (row_idx, col_idx),
+        (row_idx + 1, col_idx + 1),
+        f"{row_idx},{col_idx}",
+        f"{row_idx + 1},{col_idx + 1}",
+    )
+
+    for key in candidates:
+        if key in solution:
+            return solution[key]
+
+    return None
+
+
+def print_solved_grid(path: str, solution) -> None:
+    """
+    Print the puzzle grid with '.' cells replaced by the solved digits.
+
+    We re-open the original text file so we can keep 'X', 'Axx', 'Dyy', etc.
+    exactly as in the puzzle, and only fill numbers into '.' cells.
+    """
+    print("Solved grid (filled values):")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            first_line = True
+            row_idx = 0  # row index for CSP (0-based for the first puzzle row)
+            for raw_line in f:
+                line = raw_line.rstrip()
+
+                # First line contains dimensions "rows cols" → just print as-is.
+                if first_line:
+                    print("  " + line)
+                    first_line = False
+                    continue
+
+                tokens = line.split()
+                solved_tokens = []
+                col_idx = 0
+
+                for tok in tokens:
+                    if tok == ".":  # fillable cell
+                        val = lookup_cell_value(solution, row_idx, col_idx)
+                        solved_tokens.append(str(val) if val is not None else ".")
+                        col_idx += 1
+                    else:
+                        # clue or block; keep as-is
+                        solved_tokens.append(tok)
+                        col_idx += 1
+
+                print("  " + " ".join(solved_tokens))
+                row_idx += 1
+
+    except OSError as e:
+        print(f"  [Error reading puzzle file for solved grid: {e}]")
+
+    print()  # blank line at the end
+
+
 def run_all(puzzles_dir: str, output_csv: str | None = None, demo_only: bool = False) -> None:
     # Collect rows for CSV
     results = []
@@ -60,7 +144,8 @@ def run_all(puzzles_dir: str, output_csv: str | None = None, demo_only: bool = F
         f for f in os.listdir(puzzles_dir)
         if f.lower().endswith(".txt")
     ]
-    puzzle_files.sort()
+    # ✅ sort numerically (sample1, sample2, ..., sample15)
+    puzzle_files = sorted(puzzle_files, key=puzzle_sort_key)
 
     if demo_only:
         # Keep only the demo puzzles (if present)
@@ -89,6 +174,9 @@ def run_all(puzzles_dir: str, output_csv: str | None = None, demo_only: bool = F
         # Load puzzle once for all methods
         puzzle = load_puzzle(path)
 
+        # We will store the first solution we see and print that grid once at the end
+        first_solution = None
+
         for method_name, (use_mrv, use_lcv) in METHODS.items():
             print(f"--- Method: {method_name} (MRV={use_mrv}, LCV={use_lcv}) ---")
 
@@ -108,6 +196,10 @@ def run_all(puzzles_dir: str, output_csv: str | None = None, demo_only: bool = F
             print(f"Solution valid? {ok}")
             print()
 
+            # Remember the first valid solution we see (they should all be the same)
+            if first_solution is None and ok:
+                first_solution = solution
+
             results.append({
                 "puzzle": puzzle_name,
                 "file": fname,
@@ -119,6 +211,10 @@ def run_all(puzzles_dir: str, output_csv: str | None = None, demo_only: bool = F
                 "time_sec": f"{stats.time:.6f}",
                 "valid": int(bool(ok)),
             })
+
+        # After all methods, print the solved grid once
+        if first_solution is not None:
+            print_solved_grid(path, first_solution)
 
         print()  # extra spacing between puzzles
 

@@ -40,7 +40,7 @@ kakuro/
   model.py             # Cell, Run, KakuroPuzzle (run extraction + validation)
   combinations.py      # Precomputed (length,sum)->digit combinations
   csp_solver.py        # CSP search + heuristics + forward checking
-puzzles/               # Sample inputs (sample1..sample11, extendable)
+puzzles/               # Sample inputs (sample1..sample15, extendable)
 ```
 
 ---
@@ -211,6 +211,7 @@ Demo mode (subset only):
 ```
 python run_all.py --demo
 ```
+Note (Windows): prefer `python` over `python3` in PowerShell.
 
 ---
 ## 14. Glossary
@@ -249,6 +250,8 @@ Features:
 - Reuses a single parsed puzzle object per file for all methods (avoids repeated I/O).
 - Aggregates rows: puzzle name, method flags, nodes, backtracks, time, validity.
 - Optional demo subset (`--demo`) to keep quick classroom demonstrations fast.
+- Natural numeric sorting of files like `sample1.txt ... sample15.txt`.
+- Prints the solved grid once per puzzle by overlaying digits into `.` cells.
 
 Example command:
 ```
@@ -268,6 +271,10 @@ Columns written when `--csv` is provided:
 | backtracks  | Dead-end reversions                       |
 | time_sec    | Elapsed wall-clock seconds                |
 | valid       | 0/1 solution validity check               |
+
+Note: The solved grid printed to stdout is derived by matching solution keys
+to `(row, col)` coordinates; the runner attempts common key formats to remain
+robust. Always rely on the CSV and `check_solution` for correctness metrics.
 
 ## 21. Adding New Puzzles
 1. Create a `.txt` file in `puzzles/` following the token format (Section 2).
