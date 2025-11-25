@@ -1,0 +1,8 @@
+7 7
+X D15 D2 D16 D4 D17 X
+A15 . . . . . X
+A2 . A1D1 . A1D4 . X
+A16 . . . . . X
+A4 . A4D1 . A2D2 . X
+A17 . . . . . X
+X X X X X X X
